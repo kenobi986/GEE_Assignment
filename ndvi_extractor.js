@@ -1,46 +1,21 @@
-// import shapefile
-var shp = ee.FeatureCollection(Polygon)
-//Map.addLayer(shp, {}, 'My Ploygon')
-//Filter date range
-var IMG = data3C.filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 20).filterDate('2017-03-01', '2017-12-30').filterBounds(shp);
-//var image = data3C.filterDate('2017-03-28', '2017-06-30')
-//var Bands = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12','B10','QA60']
-//var Bands = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12','B10','QA60']
-//var Bands = ['B2','B3','B4','B8','QA60']
-//Select the bands
-//var dataset = image.filterBounds(shp).select(['B2','B3','B4','B5']).first(dataset);
-//print(dataset);
-//Map.addLayer(dataset);
-
-//Filter to get the least cloudy image for the area of interest
-//var Lesscloudy = dataset.sort('CLOUD_COVERAGE_ASSESSMENT').first();
-//print(Lesscloudy);
-//Map.addLayer(Lesscloudy);
-
-//var IMG = image.filterBounds(shp).select(Bands).sort('CLOUD_COVERAGE_ASSESSMENT');
-//print(IMG);
-//Map.addLayer(IMG);
+//Define Imports
+var data3C = ee.ImageCollection("COPERNICUS/S2_HARMONIZED"),
+    Polygon = ee.FeatureCollection("users/gorthisrikanth123/Polygon"),
+    data2A = ee.ImageCollection("COPERNICUS/S2_SR"),
+    data1C = ee.ImageCollection("COPERNICUS/S2_HARMONIZED");
 
 
-// Function to keep only vegetation and soil pixels
-//function SoilVeg(image) {
-  // Select SCL layer
-//  var scl = image.select('SCL'); 
-  // Select vegetation and soil pixels
-//  var veg = scl.eq(4); // 4 = Vegetation
-//  var soil = scl.eq(5); // 5 = Bare soils
-  // Mask if not veg or soil
-//  var mask = (veg.neq(1)).or(soil.neq(1));
-//  return image.updateMask(mask);
-//}
+//Import the dataset Shapefile and Sentinel-2 images 
 
-// Apply custom filter to S2 collection
-//var IMG2 = IMG.map(SoilVeg);
+var shp = ee.FeatureCollection(Polygon) //ShapeFile Feature Collection
+
+//Filter out the cloud cover and boundary defined by shape file
+var IMG = data1C.filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 20).filterDate('2017-01-01', '2017-12-30').filterBounds(shp);
+
+print(shp)
 
 
-// Filter defined here: 
-// https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_S2_SR#description
-
+//Mask the cloud in the images (Stadard Function)
 function maskS2clouds(image) {
   var qa = image.select('QA60');
 
@@ -57,30 +32,52 @@ function maskS2clouds(image) {
 
 // Function to compute NDVI and add result as new band
 var addNDVI = function(image) {
+   var date = image.date();
 return image.addBands(image.normalizedDifference(['B8', 'B4']));
 };
 
-// Add NDVI band to image collection
-var IMG1 = IMG.map(addNDVI);
-var IMG2 = IMG1.map(maskS2clouds);
+// Add NDVI band to image collection and remove clouds 
+var IMG1 = IMG.map(maskS2clouds);
+var IMG2 = IMG1.map(addNDVI);
 
-var evoNDVI = ui.Chart.image.seriesByRegion(
-  IMG2,                // Image collection
-  shp,      // Region
-  ee.Reducer.mean(), // Type of reducer to apply
-  'nd',              // Band
-  1);               // Scale
-// Apply second filter
 
-var plotNDVI = evoNDVI                    // Data
-    .setChartType('LineChart')            // Type of plot
-    .setOptions({                         // Plot customization
-      interpolateNulls: true,
-      lineWidth: 1,
-      pointSize: 3,
-      title: 'NDVI annual evolution',
-      hAxis: {title: 'Date'},
-      vAxis: {title: 'NDVI'}
+//print the total number of images in the given year 2017
+print(IMG2.count())
+
+
+//Use reduce mean on the image masked by the shape file 
+//set the date as the property for the resulting feature collection
+var reduced = shp.map(function(featureCollection) {
+  return IMG2.map(function(image) {
+    //Calculate the reduce mean of the images over the shape file geometry
+    var mean = image.reduceRegion({
+      geometry: featureCollection.geometry(),
+      reducer: ee.Reducer.mean(),
+    });
+    //Set the date as the property and return the feature collection
+    return featureCollection.setMulti(mean).set({date: ee.Date(image.get('system:time_start')).format('YYYY-MM-dd')})
+  })
+})
+
+//Flatten the feature collection into table for export 
+var table = reduced.flatten();
+
+print(reduced.limit(100))
+
+print(table.limit(100))
+
+//Define the properties of interest
+var properties = ee.List(['date','ID', 'nd', 'CropGrp', 'CropTyp']);
+var desc = 'NDVI Mean';
+
+//Export table to Asset 
+Export.table.toAsset({
+  collection: table.select(properties).filter(ee.Filter.and(
+    ee.Filter.neq('ID', null),
+    ee.Filter.neq('nd', null),
+    ee.Filter.neq('CropGrp', null), 
+    ee.Filter.neq('CropTyp', null),
+    ee.Filter.neq('date', null))),
+  description: desc, 
+  assetId: desc
 });
-
-print(plotNDVI)
