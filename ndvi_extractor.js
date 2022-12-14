@@ -1,3 +1,6 @@
+//Script for GEE EXtraction of NDVI values daily for Landsat images over the given ShapeFIle 
+//Author: Srikanth, Shafik
+
 //Define Imports
 var data3C = ee.ImageCollection("COPERNICUS/S2_HARMONIZED"),
     Polygon = ee.FeatureCollection("users/gorthisrikanth123/Polygon"),

@@ -1,3 +1,13 @@
+'''
+Script trains and evaluates the machine learning models for the crop clssification for a given ndvi values over the monthly average 
+
+Model Evaluation: Logistic, SVM, KNN, Randon Forest, Gaussian Navies Bayes Algorithms 
+
+Author: Srikanth, Shafik
+
+'''
+
+
 import pandas as pd
 import os
 import numpy as np
@@ -6,7 +16,7 @@ from sklearn.preprocessing import StandardScaler
 import warnings
 warnings.filterwarnings("ignore")
 
-
+#Read the data file 
 df = pd.read_csv("Croptype_ML.csv")
 print(df)
 
@@ -14,16 +24,10 @@ print(df)
 #Interpolate to fill missing values
 res = df.interpolate()
 
-#Factorize the column of croptype
-# factor = pd.factorize(res['CropType'])
-# res.CropType = factor[0]
-# definitions = factor[1]
-# print(res.CropType)
-# print(definitions)
-
 X = res.iloc[:, :-1].values
 y = res.iloc[:, -1].values
 
+#Define Imports 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
@@ -76,6 +80,7 @@ def run_exps(X_train: pd.DataFrame , y_train: pd.DataFrame, X_test: pd.DataFrame
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=21)
 
+#Test and train split for model training and evaluation 
 final = run_exps(X_train, y_train, X_test, y_test)
 bootstraps = []
 for model in list(set(final.model.values)):

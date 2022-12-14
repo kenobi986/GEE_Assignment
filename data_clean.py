@@ -1,3 +1,12 @@
+'''
+Script executing data cleaning and mining for the NDVI values for the 80 plots in the given shapefile 
+
+It executes the step 4 to 7 in the given document 
+
+Author: Karisma Yumnam
+'''
+
+
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
